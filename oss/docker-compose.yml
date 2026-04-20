@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: xunbao-minio
+    ports:
+      - "9000:9000"   # API port
+      - "9001:9001"   # Console port
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  create-bucket:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set myminio http://minio:9000 minioadmin minioadmin;
+      mc mb myminio/xunbao-images --ignore-existing;
+      mc anonymous set download myminio/xunbao-images;
+      exit 0;
+      "
+
+volumes:
+  minio-data:
+    driver: local

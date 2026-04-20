@@ -1,0 +1,49 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:postgresql://192.168.31.81:5432/xunbao
+    username: xunbao
+    password: xunbao123
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+  messages:
+    basename: messages
+    encoding: UTF-8
+    fallback-to-system-locale: true
+
+mybatis-plus:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: com.shop.shop.model
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+
+jwt:
+  secret: your-256-bit-secret-key-for-jwt-token-signing-must-be-long-enough
+  access-token-expiration: 900000
+  refresh-token-expiration: 604800000
+
+oss:
+  endpoint: http://192.168.31.81:9000
+  access-key: minioadmin
+  secret-key: minioadmin123
+  bucket: xunbao-images
+
+logistics:
+  sf:
+    code: YSRJG553
+    check-word: yIrJGSTMzlzCRiHEz5QFmFAyShZ1FTcd
+    sandbox: true
+  yto:
+    app-id: ${YTO_APP_ID:}
+    app-key: ${YTO_APP_KEY:}
+  zto:
+    app-id: ${ZTO_APP_ID:}
+    app-key: ${ZTO_APP_KEY:}
