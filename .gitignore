@@ -1,0 +1,130 @@
+# Java
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.log
+hs_err_pid*
+jvm*.dmp
+
+# Maven
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Spring Boot
+*.pid
+
+# IDE - IntelliJ
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+*.user
+*.suo
+*.classpath
+*.project
+*.settings/
+.idea_modules/
+
+# IDE - VS Code
+.vscode/
+*.code-workspace
+
+# IDE - Eclipse
+.classpath
+.project
+.settings/
+bin/
+
+# OS
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Sensitive files
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+*.truststore
+credentials.json
+secrets.json
+*.secret
+*.credentials
+
+# Environment
+.env
+.env.local
+.env.*.local
+application-local.yml
+application-local.properties
+application-dev.yml
+application-dev.properties
+
+# MinIO / Object Storage
+*.minio.local
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Build artifacts
+dist/
+build/
+bin/
+obj/
+out/
+
+# Go
+vendor/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+go.work.sum
+
+# Docker
+docker-compose.override.yml
+
+# Helm
+*.tgz
+
+# Secrets / Credentials (dangerous to commit)
+**/application-local*.yml
+**/application-local*.yaml
+**/application-dev*.yml
+**/application-prod*.yml
+credentials.properties
+secrets.properties
