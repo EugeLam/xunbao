@@ -1,9 +1,11 @@
 package com.shop.shop.service.logistics;
 
-import cn.hutool.http.HttpUtil;
-import cn.hutool.core.codec.Base64;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.sf.csim.express.service.CallExpressServiceTools;
+import com.sf.csim.express.service.HttpClientUtil;
+import com.sf.csim.express.service.IServiceCodeStandard;
+import com.sf.csim.express.service.code.ExpressServiceCodeEnum;
 import com.shop.shop.dto.RouteDTO;
 import com.shop.shop.dto.WaybillDTO;
 import com.shop.shop.dto.WaybillRequest;
@@ -11,15 +13,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @Slf4j
 @Service
@@ -36,15 +34,13 @@ public class SfExpressAdapter implements LogisticsService {
 
     private static final String SANDBOX_URL = "https://sfapi-sbox.sf-express.com/std/service";
     private static final String PROD_URL = "https://sfapi.sf-express.com/std/service";
-    private static final String SERVICE_CODE_CREATE = "EXP_RECE_CREATE_ORDER";
-    private static final String SERVICE_CODE_SEARCH = "EXP_RECE_SEARCH_ROUTES";
-    private static final String SERVICE_CODE_UPDATE = "EXP_RECE_UPDATE_ORDER";
 
+    private final CallExpressServiceTools sfTools = CallExpressServiceTools.getInstance();
     private final ObjectMapper objectMapper = new ObjectMapper().disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
 
     @Override
     public WaybillDTO createWaybill(WaybillRequest request) {
-        log.info("SF isConfigured: {}, code: {}, checkWord: {}", isConfigured(), code, checkWord);
+        log.info("SF isConfigured: {}, code: {}", isConfigured(), code);
         if (!isConfigured()) {
             log.warn("SF Express API not configured, returning mock waybill");
             return createMockWaybill(request);
@@ -53,19 +49,14 @@ public class SfExpressAdapter implements LogisticsService {
         log.info("Creating SF waybill for order: {}", request.getOrderId());
         try {
             String msgData = buildCreateOrderJson(request);
-            Map<String, Object> formData = buildFormRequest(SERVICE_CODE_CREATE, msgData);
+            Map<String, String> formData = buildFormRequest(ExpressServiceCodeEnum.EXP_RECE_CREATE_ORDER, msgData);
 
-            String response = HttpUtil.createPost(getBaseUrl())
-                    .header("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8")
-                    .form(formData)
-                    .timeout(30000)
-                    .execute()
-                    .body();
+            String response = HttpClientUtil.post(getBaseUrl(), formData);
 
             log.info("SF createWaybill response: {}", response);
             return parseCreateWaybillResponse(response, request);
         } catch (Exception e) {
-            log.error("Failed to create SF waybill: {}", e.getMessage());
+            log.error("Failed to create SF waybill: {}", e.getMessage(), e);
             return createMockWaybill(request);
         }
     }
@@ -80,19 +71,14 @@ public class SfExpressAdapter implements LogisticsService {
         log.info("Querying SF routes for waybill: {}", waybillNo);
         try {
             String msgData = buildSearchRoutesJson(waybillNo);
-            Map<String, Object> formData = buildFormRequest(SERVICE_CODE_SEARCH, msgData);
+            Map<String, String> formData = buildFormRequest(ExpressServiceCodeEnum.EXP_RECE_SEARCH_ROUTES, msgData);
 
-            String response = HttpUtil.createPost(getBaseUrl())
-                    .header("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8")
-                    .form(formData)
-                    .timeout(30000)
-                    .execute()
-                    .body();
+            String response = HttpClientUtil.post(getBaseUrl(), formData);
 
             log.info("SF getRoutes response: {}", response);
             return parseRoutesResponse(response);
         } catch (Exception e) {
-            log.error("Failed to query SF routes: {}", e.getMessage());
+            log.error("Failed to query SF routes: {}", e.getMessage(), e);
             return Collections.emptyList();
         }
     }
@@ -107,19 +93,14 @@ public class SfExpressAdapter implements LogisticsService {
         log.info("Canceling SF waybill: {}", waybillNo);
         try {
             String msgData = buildUpdateOrderJson(waybillNo, 2);
-            Map<String, Object> formData = buildFormRequest(SERVICE_CODE_UPDATE, msgData);
+            Map<String, String> formData = buildFormRequest(ExpressServiceCodeEnum.EXP_RECE_UPDATE_ORDER, msgData);
 
-            String response = HttpUtil.createPost(getBaseUrl())
-                    .header("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8")
-                    .form(formData)
-                    .timeout(30000)
-                    .execute()
-                    .body();
+            String response = HttpClientUtil.post(getBaseUrl(), formData);
 
             log.info("SF cancelWaybill response: {}", response);
             return parseCancelResponse(response);
         } catch (Exception e) {
-            log.error("Failed to cancel SF waybill: {}", e.getMessage());
+            log.error("Failed to cancel SF waybill: {}", e.getMessage(), e);
             return false;
         }
     }
@@ -148,28 +129,19 @@ public class SfExpressAdapter implements LogisticsService {
         return sandbox ? SANDBOX_URL : PROD_URL;
     }
 
-    private Map<String, Object> buildFormRequest(String serviceCode, String msgData) throws Exception {
-        long timestamp = System.currentTimeMillis() / 1000;
-        String msgDigest = generateSignature(msgData, timestamp);
+    private Map<String, String> buildFormRequest(IServiceCodeStandard serviceCode, String msgData) throws Exception {
+        String timestamp = String.valueOf(System.currentTimeMillis());
+        String msgDigest = sfTools.getMsgDigest(msgData, timestamp, checkWord);
 
-        Map<String, Object> formData = new HashMap<>();
-        formData.put("requestID", UUID.randomUUID().toString());
-        formData.put("serviceCode", serviceCode);
-        formData.put("PartnerID", code);
-        formData.put("timestamp", String.valueOf(timestamp));
-        formData.put("msgData", URLEncoder.encode(msgData, "UTF-8"));
+        Map<String, String> formData = new HashMap<>();
+        formData.put("partnerID", code);
+        formData.put("requestID", java.util.UUID.randomUUID().toString().replace("-", ""));
+        formData.put("serviceCode", serviceCode.getCode());
+        formData.put("timestamp", timestamp);
+        formData.put("msgData", msgData);
         formData.put("msgDigest", msgDigest);
 
         return formData;
-    }
-
-    private String generateSignature(String msgData, long timestamp) throws Exception {
-        String toVerifyText = msgData + timestamp + checkWord;
-        toVerifyText = URLEncoder.encode(toVerifyText, "UTF-8");
-        MessageDigest md5 = MessageDigest.getInstance("MD5");
-        md5.update(toVerifyText.getBytes(StandardCharsets.UTF_8));
-        byte[] md = md5.digest();
-        return Base64.encode(md);
     }
 
     private String buildCreateOrderJson(WaybillRequest request) throws Exception {
@@ -255,8 +227,22 @@ public class SfExpressAdapter implements LogisticsService {
                 Map<String, Object> resultData = objectMapper.readValue(apiResultData, Map.class);
                 Object success = resultData.get("success");
                 if (Boolean.TRUE.equals(success) || "true".equals(success)) {
-                    Object waybillNoObj = resultData.get("waybillNo");
-                    String waybillNo = waybillNoObj != null ? waybillNoObj.toString() : null;
+                    // 优先从waybillNoInfoList获取
+                    Object waybillNoInfoListObj = resultData.get("waybillNoInfoList");
+                    String waybillNo = null;
+                    if (waybillNoInfoListObj instanceof List) {
+                        List<?> list = (List<?>) waybillNoInfoListObj;
+                        if (!list.isEmpty() && list.get(0) instanceof Map) {
+                            Map<?, ?> waybillInfo = (Map<?, ?>) list.get(0);
+                            waybillNo = (String) waybillInfo.get("waybillNo");
+                        }
+                    }
+                    // 备用：从waybillNo获取
+                    if (waybillNo == null || waybillNo.isBlank()) {
+                        Object waybillNoObj = resultData.get("waybillNo");
+                        waybillNo = waybillNoObj != null ? waybillNoObj.toString() : null;
+                    }
+                    // 备用：从waybillNoList获取
                     if (waybillNo == null || waybillNo.isBlank()) {
                         Object waybillNosObj = resultData.get("waybillNoList");
                         if (waybillNosObj instanceof List) {
@@ -280,7 +266,7 @@ public class SfExpressAdapter implements LogisticsService {
             log.warn("SF API returned error: {}", response);
             return createMockWaybill(request);
         } catch (Exception e) {
-            log.error("Failed to parse SF response: {}", e.getMessage());
+            log.error("Failed to parse SF response: {}", e.getMessage(), e);
             return createMockWaybill(request);
         }
     }
@@ -310,7 +296,7 @@ public class SfExpressAdapter implements LogisticsService {
                 }
             }
         } catch (Exception e) {
-            log.error("Failed to parse routes response: {}", e.getMessage());
+            log.error("Failed to parse routes response: {}", e.getMessage(), e);
         }
         return routes;
     }
@@ -325,7 +311,7 @@ public class SfExpressAdapter implements LogisticsService {
                 return Boolean.TRUE.equals(success) || "true".equals(success);
             }
         } catch (Exception e) {
-            log.error("Failed to parse cancel response: {}", e.getMessage());
+            log.error("Failed to parse cancel response: {}", e.getMessage(), e);
         }
         return false;
     }
